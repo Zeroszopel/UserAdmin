@@ -233,11 +233,7 @@ public class UserServlet extends HttpServlet {
     			request.setAttribute("errors", errors);
     			request.getRequestDispatcher("user/edit.jsp").forward(request, response);
     		} else {
-    			if(userDAO.selectUserByEmail(email)!=null) {
-    				flag=false;
-    				hashMap.put("email", "Email is already used");
-    				System.out.println(this.getClass()+" Email is already used");
-    			}
+    			System.out.println("checking ");
     			if(countryDAO.selectCountry(idCountry)==null) {
     				flag=false;
     				hashMap.put("country", "Country invalid");
@@ -245,6 +241,7 @@ public class UserServlet extends HttpServlet {
     			
     			}
     			if(flag) {
+    				System.out.println("checked");
     				userDAO.updateUser(user);
     				User u = new User();
     				u=userDAO.selectUser(id);

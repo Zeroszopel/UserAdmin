@@ -2,14 +2,14 @@ package com.demo.model;
 
 import javax.validation.constraints.*;
 
-public class Country {
+public class Category {
 	private int id;
 	private String name;
-	public Country() {}
-	public Country(String name) {
+	public Category() {}
+	public Category(String name) {
 		this.name=name;
 	}
-	public Country(int id,String name) {
+	public Category(int id,String name) {
 		this.id=id;
 		this.name=name;
 	}

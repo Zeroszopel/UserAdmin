@@ -63,6 +63,9 @@
             </tr>
         </table>
     </form>
+    <div>
+    	${errors}
+    </div>
 </div>
 </body>
 </html>
