@@ -83,21 +83,42 @@ public class UserServlet extends HttpServlet {
             throw new ServletException(ex);
         }
     }
-
     private void listUser(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, IOException, ServletException {
-        List<User> listUser = userDAO.selectAllUsers();
-        request.setAttribute("listUser", listUser);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("user/list.jsp");
+    	int page = 1;
+        int recordsPerPage = 5;
+        if(request.getParameter("page") != null)
+            page = Integer.parseInt(request.getParameter("page"));
+        
+        String text=request.getParameter("search");
+    	if(text!=null) {
+    			if(text.trim()!="") {
+    				
+    				List<User> listUser = userDAO.selectSearchUsers((page-1)*recordsPerPage,recordsPerPage,text);
+    				request.setAttribute("search", text);
+    				request.setAttribute("listUser", listUser);
+    			} else {
+    				List<User> listUser = userDAO.selectAllUsers((page-1)*recordsPerPage,recordsPerPage);
+    	    		request.setAttribute("listUser", listUser);
+    			}
+    	}else {
+    		List<User> listUser = userDAO.selectAllUsers((page-1)*recordsPerPage,recordsPerPage);
+    		request.setAttribute("listUser", listUser);
+    	}
+    	int noOfRecords = userDAO.getNoOfRecords();
+        int noOfPages = (int) Math.ceil(noOfRecords * 1.0 / recordsPerPage);
+        request.setAttribute("noOfPages", noOfPages);
+        request.setAttribute("currentPage", page);
+        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/user/list.jsp");
         dispatcher.forward(request, response);
+    	
     }
-
     private void showNewForm(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
         List<Country> listCountry = countryDAO.selectAllCountry();
         request.setAttribute("listCountry", listCountry);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("user/create.jsp");
+        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/user/create.jsp");
         dispatcher.forward(request, response);
     }
 
@@ -105,7 +126,7 @@ public class UserServlet extends HttpServlet {
             throws SQLException, ServletException, IOException {
         int id = Integer.parseInt(request.getParameter("id"));
         User existingUser = userDAO.selectUser(id);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("user/edit.jsp");
+        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/user/edit.jsp");
         request.setAttribute("user", existingUser);
         dispatcher.forward(request, response);
 
@@ -118,7 +139,7 @@ public class UserServlet extends HttpServlet {
 		 * request.getParameter("email"); String country =
 		 * request.getParameter("country"); User newUser = new User(name, email,
 		 * country); userDAO.insertUser(newUser); RequestDispatcher dispatcher =
-		 * request.getRequestDispatcher("user/create.jsp"); dispatcher.forward(request,
+		 * request.getRequestDispatcher("admin/user/create.jsp"); dispatcher.forward(request,
 		 * response);
 		 */
     	User user = new User();
@@ -146,9 +167,10 @@ public class UserServlet extends HttpServlet {
     			errors+="</ul>";
     			request.setAttribute("user", user);
     			request.setAttribute("errors", errors);
-    			request.getRequestDispatcher("user/create.jsp").forward(request, response);
+    			request.getRequestDispatcher("admin/user/create.jsp").forward(request, response);
     		} else {
     			if(userDAO.selectUserByEmail(email)!=null) {
+    				
     				flag=false;
     				hashMap.put("email", "Email is already used");
     				System.out.println(this.getClass()+" Email is already used");
@@ -163,7 +185,7 @@ public class UserServlet extends HttpServlet {
     				userDAO.insertUser(user);
     				User u = new User();
     				request.setAttribute("user", u);
-    				request.getRequestDispatcher("user/create.jsp").forward(request, response);
+    				request.getRequestDispatcher("admin/user/create.jsp").forward(request, response);
     			} else {
     				errors = "<ul>";
     				hashMap.forEach(new BiConsumer<String, String>(){
@@ -176,7 +198,7 @@ public class UserServlet extends HttpServlet {
     				request.setAttribute("user", user);
     				request.setAttribute("errors", errors);
     				System.out.println(this.getClass()+" !constraintViolation.isEmpty()");
-    				request.getRequestDispatcher("user/create.jsp").forward(request, response);
+    				request.getRequestDispatcher("admin/user/create.jsp").forward(request, response);
     			}
     		}
     	} catch(NumberFormatException e){
@@ -186,7 +208,7 @@ public class UserServlet extends HttpServlet {
     		errors+="</ul>";
     		request.setAttribute("user", user);
     		request.setAttribute("errors", errors);
-    		request.getRequestDispatcher("user/create.jsp").forward(request, response);;
+    		request.getRequestDispatcher("admin/user/create.jsp").forward(request, response);;
     	}
     }
 
@@ -201,7 +223,7 @@ public class UserServlet extends HttpServlet {
 		 * userDAO.selectUser(id); List<Country> listCountry =
 		 * countryDAO.selectAllCountry(); request.setAttribute("listCountry",
 		 * listCountry); RequestDispatcher dispatcher =
-		 * request.getRequestDispatcher("user/edit.jsp"); request.setAttribute("user",
+		 * request.getRequestDispatcher("admin/user/edit.jsp"); request.setAttribute("user",
 		 * existingUser); dispatcher.forward(request, response);
 		 */
     	User user = new User();
@@ -231,9 +253,16 @@ public class UserServlet extends HttpServlet {
     			errors+="</ul>";
     			request.setAttribute("user", user);
     			request.setAttribute("errors", errors);
-    			request.getRequestDispatcher("user/edit.jsp").forward(request, response);
+    			request.getRequestDispatcher("admin/user/edit.jsp").forward(request, response);
     		} else {
     			System.out.println("checking ");
+
+    			if((userDAO.selectUserByEmail(email)!=null)&&!(userDAO.selectUser(id).getEmail().equals(email))) {
+    				flag=false;
+    				hashMap.put("email", "Email already exist");
+    				System.out.println(this.getClass()+" Email already exist");
+    			
+    			}
     			if(countryDAO.selectCountry(idCountry)==null) {
     				flag=false;
     				hashMap.put("country", "Country invalid");
@@ -246,7 +275,7 @@ public class UserServlet extends HttpServlet {
     				User u = new User();
     				u=userDAO.selectUser(id);
     				request.setAttribute("user", u);
-    				request.getRequestDispatcher("user/edit.jsp").forward(request, response);
+    				request.getRequestDispatcher("admin/user/edit.jsp").forward(request, response);
     			} else {
     				errors = "<ul>";
     				hashMap.forEach(new BiConsumer<String, String>(){
@@ -259,7 +288,7 @@ public class UserServlet extends HttpServlet {
     				request.setAttribute("user", user);
     				request.setAttribute("errors", errors);
     				System.out.println(this.getClass()+" !constraintViolation.isEmpty()");
-    				request.getRequestDispatcher("user/edit.jsp").forward(request, response);
+    				request.getRequestDispatcher("admin/user/edit.jsp").forward(request, response);
     			}
     		}
     	} catch(NumberFormatException e){
@@ -269,7 +298,7 @@ public class UserServlet extends HttpServlet {
     		errors+="</ul>";
     		request.setAttribute("user", user);
     		request.setAttribute("errors", errors);
-    		request.getRequestDispatcher("user/edit.jsp").forward(request, response);;
+    		request.getRequestDispatcher("admin/user/edit.jsp").forward(request, response);;
     	}
     }
 
@@ -280,7 +309,7 @@ public class UserServlet extends HttpServlet {
 
         List<User> listUser = userDAO.selectAllUsers();
         request.setAttribute("listUser", listUser);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("user/list.jsp");
+        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/user/list.jsp");
         dispatcher.forward(request, response);
     }
 }

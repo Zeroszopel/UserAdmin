@@ -14,15 +14,17 @@ public class ProductDAO implements IProductDAO{
     private String jdbcURL = "jdbc:mysql://localhost:3306/demo";
     private String jdbcProductname = "root";
     private String jdbcPrice = "";
+    private int noOfRecords;
+    private static final String INSERT_PRODUCTS_SQL = "INSERT INTO products" + "  (name, description,price,category,image) VALUES " +
+            " (?, ?, ?, ?,?);";
 
-    private static final String INSERT_PRODUCTS_SQL = "INSERT INTO products" + "  (name, description,price,category) VALUES " +
-            " (?, ?, ?);";
-
-    private static final String SELECT_USER_BY_ID = "select id,name,description,price,category from products where id =?";
-    private static final String SELECT_USER_BY_EMAIL = "select id,name,description,price,category from products where description =?";
+    private static final String SELECT_USER_BY_ID = "select * from products where id =?";
+    private static final String SELECT_USER_BY_EMAIL = "select * from products where description =?";
     private static final String SELECT_ALL_PRODUCTS = "select * from products";
+    private static final String SELECT_ALL_PRODUCTS_PAGE = "select SQL_CALC_FOUND_ROWS * from products limit ?,?";
+    private static final String SELECT_SEARCH_PRODUCTS = "SELECT SQL_CALC_FOUND_ROWS * FROM products where id like N? or name like N? or description like N? or category like N? or price like N? limit ?,?";
     private static final String DELETE_PRODUCTS_SQL = "delete from products where id = ?;";
-    private static final String UPDATE_PRODUCTS_SQL = "update products set name = ?,description= ?,price=?, category =? where id = ?;";
+    private static final String UPDATE_PRODUCTS_SQL = "update products set name = ?,description= ?,price=?, category =?, image=? where id = ?;";
 
     public ProductDAO() {
     }
@@ -30,7 +32,7 @@ public class ProductDAO implements IProductDAO{
     protected Connection getConnection() {
         Connection connection = null;
         try {
-            Class.forName("com.mysql.jdbc.Driver");
+            Class.forName("com.mysql.cj.jdbc.Driver");
             connection = DriverManager.getConnection(jdbcURL, jdbcProductname, jdbcPrice);
         } catch (SQLException e) {
             // TODO Auto-generated catch block
@@ -43,13 +45,15 @@ public class ProductDAO implements IProductDAO{
     }
 
     public void insertProduct(Product user) throws SQLException {
-        System.out.println(INSERT_PRODUCTS_SQL);
+        
         // try-with-resource statement will auto close the connection.
         try (Connection connection = getConnection(); PreparedStatement preparedStatement = connection.prepareStatement(INSERT_PRODUCTS_SQL)) {
             preparedStatement.setString(1, user.getName());
             preparedStatement.setString(2, user.getDescription());
             preparedStatement.setInt(3, user.getPrice());
             preparedStatement.setString(4, user.getCategory());
+            preparedStatement.setString(5, user.getImage());
+            System.out.println(preparedStatement);
             preparedStatement.executeUpdate();
         } catch (SQLException e) {
             printSQLException(e);
@@ -71,8 +75,9 @@ public class ProductDAO implements IProductDAO{
                 String name = rs.getString("name");
                 String description = rs.getString("description");
                 String category = rs.getString("category");
+                String image=rs.getString("image");
                 int price = rs.getInt("price");
-                user = new Product(id, name, description, category, price);
+                user = new Product(id, name, description, category,image, price);
             }
         } catch (SQLException e) {
             printSQLException(e);
@@ -95,8 +100,9 @@ public class ProductDAO implements IProductDAO{
                 String name = rs.getString("name");
                 String description = rs.getString("description");
                 String category = rs.getString("category");
+                String image=rs.getString("image");
                 int price = rs.getInt("price");
-                user = new Product(id, name, description, category, price);
+                user = new Product(id, name, description, category,image, price);
             }
         } catch (SQLException e) {
             printSQLException(e);
@@ -123,15 +129,89 @@ public class ProductDAO implements IProductDAO{
                 String name = rs.getString("name");
                 String description = rs.getString("description");
                 String category = rs.getString("category");
+                String image=rs.getString("image");
                 int price = rs.getInt("price");
-                products.add(new Product(id, name, description, category, price));
+                products.add(new Product(id, name, description, category,image, price));
             }
         } catch (SQLException e) {
             printSQLException(e);
         }
         return products;
     }
+    public List<Product> selectAllProducts(int offset,int noOfRecords) {
 
+        // using try-with-resources to avoid closing resources (boiler plate code)
+        List<Product> products = new ArrayList<>();
+        // Step 1: Establishing a Connection
+        try {Connection connection = getConnection();
+
+             // Step 2:Create a statement using connection object
+             PreparedStatement statement = 
+            		 connection.prepareStatement(SELECT_ALL_PRODUCTS_PAGE);
+             statement.setInt(1,offset);
+             statement.setInt(2,noOfRecords);
+            // Step 3: Execute the query or update query
+            ResultSet rs = statement.executeQuery();
+
+            // Step 4: Process the ResultSet object.
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String name = rs.getString("name");
+                String description = rs.getString("description");
+                String category = rs.getString("category");
+                String image=rs.getString("image");
+                int price = rs.getInt("price");
+                products.add(new Product(id, name, description, category, image, price));
+            }
+            statement=connection.prepareStatement("SELECT FOUND_ROWS()");
+            rs = statement.executeQuery();
+            if(rs.next())
+                this.noOfRecords = rs.getInt(1);
+        } catch (SQLException e) {
+            printSQLException(e);
+        }
+        return products;
+    }
+    public List<Product> selectSearchProducts(int offset,int noOfRecords,String search) {
+
+        // using try-with-resources to avoid closing resources (boiler plate code)
+        List<Product> products = new ArrayList<>();
+        // Step 1: Establishing a Connection
+        try {Connection connection = getConnection();
+
+             // Step 2:Create a statement using connection object
+             PreparedStatement statement = 
+            		 connection.prepareStatement(SELECT_SEARCH_PRODUCTS);
+             statement.setString(1,search);
+             statement.setString(2,"%"+search+"%");
+             statement.setString(3,"%"+search+"%");
+             statement.setString(4,"%"+search+"%");
+             statement.setString(5,search);
+             statement.setInt(6,offset);
+             statement.setInt(7,noOfRecords);
+            // Step 3: Execute the query or update query
+            ResultSet rs = statement.executeQuery();
+
+            // Step 4: Process the ResultSet object.
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String name = rs.getString("name");
+                String description = rs.getString("description");
+                String category = rs.getString("category");
+                String image=rs.getString("image");
+                int price = rs.getInt("price");
+                products.add(new Product(id, name, description, category, image, price));
+            }
+            statement=connection.prepareStatement("SELECT FOUND_ROWS()");
+            rs = statement.executeQuery();
+            if(rs.next())
+                this.noOfRecords = rs.getInt(1);
+        } catch (SQLException e) {
+            printSQLException(e);
+        }
+        return products;
+    }
+    @Override
     public boolean deleteProduct(int id) throws SQLException {
         boolean rowDeleted;
         try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(DELETE_PRODUCTS_SQL);) {
@@ -140,7 +220,7 @@ public class ProductDAO implements IProductDAO{
         }
         return rowDeleted;
     }
-
+    @Override
     public boolean updateProduct(Product user) throws SQLException {
         boolean rowUpdated;
         try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(UPDATE_PRODUCTS_SQL);) {
@@ -148,13 +228,16 @@ public class ProductDAO implements IProductDAO{
             statement.setString(2, user.getDescription());
             statement.setInt(3, user.getPrice());
             statement.setString(4, user.getCategory());
-            statement.setInt(5, user.getId());
-            System.out.println(statement);
+            statement.setString(5, user.getImage());
+            statement.setInt(6, user.getId());
             rowUpdated = statement.executeUpdate() > 0;
         }
         return rowUpdated;
     }
 
+    public int getNoOfRecords() {
+        return noOfRecords;
+    }
     private void printSQLException(SQLException ex) {
         for (Throwable e : ex) {
             if (e instanceof SQLException) {

@@ -16,10 +16,10 @@ import com.demo.model.Country;
 @WebServlet(name="CountryServlet", urlPatterns= {"/country"})
 public class CountryServlet extends HttpServlet{
 	   private static final long serialVersionUID = 1L;
-	    private CountryDAO CountryDAO;
+	    private CountryDAO countryDAO;
 
 	    public void init() {
-	        CountryDAO = new CountryDAO();
+	        countryDAO = new CountryDAO();
 	    }
 
 	    protected void doPost(HttpServletRequest request, HttpServletResponse response)
@@ -71,25 +71,47 @@ public class CountryServlet extends HttpServlet{
 
 	    private void listCountry(HttpServletRequest request, HttpServletResponse response)
 	            throws SQLException, IOException, ServletException {
-	    	
-	        List<Country> listCountry = CountryDAO.selectAllCountry();
-	        request.setAttribute("listCountry", listCountry);
-	        
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("country/list.jsp");
+	    	int page = 1;
+	        int recordsPerPage = 5;
+	        if(request.getParameter("page") != null)
+	            page = Integer.parseInt(request.getParameter("page"));
+	        String text=request.getParameter("search");
+	    	if(text!=null) {
+	    			if(text.trim()!="") {
+	    				
+	    				List<Country> listCountry = countryDAO.selectSearchCountry((page-1)*recordsPerPage,
+                                recordsPerPage,text);
+	    				request.setAttribute("search", text);
+	    				request.setAttribute("listCountry", listCountry);
+	    			} else {
+	    				List<Country> listCountry = countryDAO.selectAllCountry((page-1)*recordsPerPage,
+                                recordsPerPage);
+	    				request.setAttribute("listCountry", listCountry);
+	    			}
+	    	}else {
+				List<Country> listCountry = countryDAO.selectAllCountry((page-1)*recordsPerPage,
+                        recordsPerPage);
+				request.setAttribute("listCountry", listCountry);
+	    	}
+	    	int noOfRecords = countryDAO.getNoOfRecords();
+	        int noOfPages = (int) Math.ceil(noOfRecords * 1.0 / recordsPerPage);
+	        request.setAttribute("noOfPages", noOfPages);
+	        request.setAttribute("currentPage", page);
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/country/list.jsp");
 	        dispatcher.forward(request, response);
 	    }
 
 	    private void showNewForm(HttpServletRequest request, HttpServletResponse response)
 	            throws ServletException, IOException {
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("country/create.jsp");
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/country/create.jsp");
 	        dispatcher.forward(request, response);
 	    }
 
 	    private void showEditForm(HttpServletRequest request, HttpServletResponse response)
 	            throws SQLException, ServletException, IOException {
 	        int id = Integer.parseInt(request.getParameter("id"));
-	        Country existingCountry = CountryDAO.selectCountry(id);
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("country/edit.jsp");
+	        Country existingCountry = countryDAO.selectCountry(id);
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/country/edit.jsp");
 	        request.setAttribute("country", existingCountry);
 	        dispatcher.forward(request, response);
 
@@ -99,8 +121,8 @@ public class CountryServlet extends HttpServlet{
 	            throws SQLException, IOException, ServletException {
 	        String name = request.getParameter("name");
 	        Country newCountry = new Country(name);
-	        CountryDAO.insertCountry(newCountry);
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("country/create.jsp");
+	        countryDAO.insertCountry(newCountry);
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/country/create.jsp");
 	        dispatcher.forward(request, response);
 	    }
 
@@ -110,9 +132,9 @@ public class CountryServlet extends HttpServlet{
 	        String name = request.getParameter("name");
 	        System.out.println(name);
 	        Country book = new Country(id, name);
-	        CountryDAO.updateCountry(book);
-	        Country existingCountry = CountryDAO.selectCountry(id);
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("country/edit.jsp");
+	        countryDAO.updateCountry(book);
+	        Country existingCountry = countryDAO.selectCountry(id);
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/country/edit.jsp");
 	        request.setAttribute("country", existingCountry);
 	        dispatcher.forward(request, response);
 	    }
@@ -120,11 +142,11 @@ public class CountryServlet extends HttpServlet{
 	    private void deleteCountry(HttpServletRequest request, HttpServletResponse response)
 	            throws SQLException, IOException, ServletException {
 	        int id = Integer.parseInt(request.getParameter("id"));
-	        CountryDAO.deleteCountry(id);
+	        countryDAO.deleteCountry(id);
 
-	        List<Country> listCountry = CountryDAO.selectAllCountry();
+	        List<Country> listCountry = countryDAO.selectAllCountry();
 	        request.setAttribute("listCountry", listCountry);
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("country/list.jsp");
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/country/list.jsp");
 	        dispatcher.forward(request, response);
 	    }
 }

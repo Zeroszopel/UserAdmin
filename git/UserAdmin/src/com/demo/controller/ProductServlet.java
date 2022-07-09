@@ -1,5 +1,7 @@
 package com.demo.controller;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -9,10 +11,12 @@ import java.util.function.BiConsumer;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.Part;
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
@@ -20,11 +24,13 @@ import javax.validation.ValidatorFactory;
 
 import com.demo.dao.ProductDAO;
 import com.demo.model.Product;
-
 import com.demo.dao.CategoryDAO;
 import com.demo.model.Category;
 
 @WebServlet(name = "ProductServlet", urlPatterns = "/products")
+@MultipartConfig(fileSizeThreshold = 1024 * 1024 * 2, // 2MB
+maxFileSize = 1024 * 1024 * 50, // 50MB
+maxRequestSize = 1024 * 1024 * 50) // 50MB
 public class ProductServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private ProductDAO productDAO;
@@ -86,9 +92,33 @@ public class ProductServlet extends HttpServlet {
 
     private void listProduct(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, IOException, ServletException {
-        List<Product> listProduct = productDAO.selectAllProducts();
-        request.setAttribute("listProduct", listProduct);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("product/list.jsp");
+    	int page = 1;
+        int recordsPerPage = 5;
+        if(request.getParameter("page") != null)
+            page = Integer.parseInt(request.getParameter("page"));
+        String text=request.getParameter("search");
+    	if(text!=null) {
+    			if(text.trim()!="") {
+    				
+    				List<Product> listProduct = productDAO.selectSearchProducts((page-1)*recordsPerPage,
+                            recordsPerPage,text);
+    				request.setAttribute("search", text);
+    				request.setAttribute("listProduct", listProduct);
+    			} else {
+    				List<Product> listProduct = productDAO.selectAllProducts((page-1)*recordsPerPage,
+                            recordsPerPage);
+    				request.setAttribute("listProduct", listProduct);
+    			}
+    	}else {
+    		List<Product> listProduct = productDAO.selectAllProducts((page-1)*recordsPerPage,
+                    recordsPerPage);
+    		request.setAttribute("listProduct", listProduct);
+    	}
+    	int noOfRecords = productDAO.getNoOfRecords();
+        int noOfPages = (int) Math.ceil(noOfRecords * 1.0 / recordsPerPage);
+        request.setAttribute("noOfPages", noOfPages);
+        request.setAttribute("currentPage", page);
+        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/product/list.jsp");
         dispatcher.forward(request, response);
     }
 
@@ -97,7 +127,7 @@ public class ProductServlet extends HttpServlet {
 
         List<Category> listCategory = categoryDAO.selectAllCategory();
         request.setAttribute("listCategory", listCategory);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("product/create.jsp");
+        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/product/create.jsp");
         dispatcher.forward(request, response);
     }
 
@@ -105,7 +135,7 @@ public class ProductServlet extends HttpServlet {
             throws SQLException, ServletException, IOException {
         int id = Integer.parseInt(request.getParameter("id"));
         Product existingProduct = productDAO.selectProduct(id);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("product/edit.jsp");
+        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/product/edit.jsp");
         request.setAttribute("product", existingProduct);
         dispatcher.forward(request, response);
 
@@ -118,14 +148,26 @@ public class ProductServlet extends HttpServlet {
 		 * request.getParameter("email"); String category =
 		 * request.getParameter("category"); Product newProduct = new Product(name, email,
 		 * category); productDAO.insertProduct(newProduct); RequestDispatcher dispatcher =
-		 * request.getRequestDispatcher("product/create.jsp"); dispatcher.forward(request,
+		 * request.getRequestDispatcher("admin/product/create.jsp"); dispatcher.forward(request,
 		 * response);
 		 */
-    	System.out.println("inserting...");
     	Product product = new Product();
     	boolean flag = true;
     	Map<String, String> hashMap = new HashMap<String, String>();
-    	
+    	response.setContentType("text/html");
+		response.setCharacterEncoding("UTF-8");
+		request.setCharacterEncoding("UTF-8");
+		
+			Part part = request.getPart("image");
+			String realPath = request.getServletContext().getRealPath("/admin/images");
+			String filename = Paths.get(part.getSubmittedFileName()).getFileName().toString();
+			
+			if(!Files.exists(Paths.get(realPath))) {
+				Files.createDirectory(Paths.get(realPath));
+				
+			}
+			product.setImage("admin/images/"+filename);
+			part.write(realPath+"\\"+filename);
     	System.out.println(this.getClass()+" Validation");
     	try {
     		product.setName(request.getParameter("name"));
@@ -133,7 +175,6 @@ public class ProductServlet extends HttpServlet {
     		product.setPrice(Integer.parseInt(request.getParameter("price")));
     		int idCategory=Integer.parseInt(request.getParameter("category"));
     		product.setCategory(categoryDAO.selectCategory(idCategory).getName());
-    		String desc=request.getParameter("desc");
     		System.out.println(this.getClass()+" Product info: "+product.getName() );
     		ValidatorFactory validatorFactory=Validation.buildDefaultValidatorFactory();
     		Validator validator= validatorFactory.getValidator();
@@ -147,13 +188,8 @@ public class ProductServlet extends HttpServlet {
     			errors+="</ul>";
     			request.setAttribute("product", product);
     			request.setAttribute("errors", errors);
-    			request.getRequestDispatcher("product/create.jsp").forward(request, response);
+    			request.getRequestDispatcher("admin/product/create.jsp").forward(request, response);
     		} else {
-    			if(productDAO.selectProductByDesc(desc)!=null) {
-    				flag=false;
-    				hashMap.put("email", "Email is already used");
-    				System.out.println(this.getClass()+" Email is already used");
-    			}
     			if(categoryDAO.selectCategory(idCategory)==null) {
     				flag=false;
     				hashMap.put("category", "Category invalid");
@@ -164,7 +200,7 @@ public class ProductServlet extends HttpServlet {
     				productDAO.insertProduct(product);
     				Product u = new Product();
     				request.setAttribute("product", u);
-    				request.getRequestDispatcher("product/create.jsp").forward(request, response);
+    				request.getRequestDispatcher("admin/product/create.jsp").forward(request, response);
     			} else {
     				errors = "<ul>";
     				hashMap.forEach(new BiConsumer<String, String>(){
@@ -177,7 +213,7 @@ public class ProductServlet extends HttpServlet {
     				request.setAttribute("product", product);
     				request.setAttribute("errors", errors);
     				System.out.println(this.getClass()+" !constraintViolation.isEmpty()");
-    				request.getRequestDispatcher("product/create.jsp").forward(request, response);
+    				request.getRequestDispatcher("admin/product/create.jsp").forward(request, response);
     			}
     		}
     	} catch(NumberFormatException e){
@@ -187,7 +223,7 @@ public class ProductServlet extends HttpServlet {
     		errors+="</ul>";
     		request.setAttribute("product", product);
     		request.setAttribute("errors", errors);
-    		request.getRequestDispatcher("product/create.jsp").forward(request, response);;
+    		request.getRequestDispatcher("admin/product/create.jsp").forward(request, response);;
     	}
     }
 
@@ -202,14 +238,29 @@ public class ProductServlet extends HttpServlet {
 		 * productDAO.selectProduct(id); List<Category> listCategory =
 		 * categoryDAO.selectAllCategory(); request.setAttribute("listCategory",
 		 * listCategory); RequestDispatcher dispatcher =
-		 * request.getRequestDispatcher("product/edit.jsp"); request.setAttribute("product",
+		 * request.getRequestDispatcher("admin/product/edit.jsp"); request.setAttribute("product",
 		 * existingProduct); dispatcher.forward(request, response);
 		 */
     	
     	Product product = new Product();
     	boolean flag = true;
     	Map<String, String> hashMap = new HashMap<String, String>();
-    	
+    	response.setContentType("text/html");
+		response.setCharacterEncoding("UTF-8");
+		request.setCharacterEncoding("UTF-8");
+		
+			Part part = request.getPart("image");
+			String realPath = request.getServletContext().getRealPath("/admin/images");
+			String filename = Paths.get(part.getSubmittedFileName()).getFileName().toString();
+			
+			System.out.println(realPath + "\\"+filename);
+			
+			if(!Files.exists(Paths.get(realPath))) {
+				Files.createDirectory(Paths.get(realPath));
+				
+			}
+			product.setImage("admin/images/"+filename);
+			part.write(realPath+"\\"+filename);
     	System.out.println(this.getClass()+" Validation");
     	try {
     		int id = Integer.parseInt(request.getParameter("id"));
@@ -235,7 +286,7 @@ public class ProductServlet extends HttpServlet {
     			errors+="</ul>";
     			request.setAttribute("product", product);
     			request.setAttribute("errors", errors);
-    			request.getRequestDispatcher("product/edit.jsp").forward(request, response);
+    			request.getRequestDispatcher("admin/product/edit.jsp").forward(request, response);
     		} else {
     			if(categoryDAO.selectCategory(idCategory)==null) {
     				flag=false;
@@ -244,12 +295,11 @@ public class ProductServlet extends HttpServlet {
     			
     			}
     			if(flag) {
-    				System.out.println("editing...");
     				productDAO.updateProduct(product);
     				Product u = new Product();
     				u=productDAO.selectProduct(id);
     				request.setAttribute("product", u);
-    				request.getRequestDispatcher("product/edit.jsp").forward(request, response);
+    				request.getRequestDispatcher("admin/product/edit.jsp").forward(request, response);
     			} else {
     				errors = "<ul>";
     				hashMap.forEach(new BiConsumer<String, String>(){
@@ -262,7 +312,7 @@ public class ProductServlet extends HttpServlet {
     				request.setAttribute("product", product);
     				request.setAttribute("errors", errors);
     				System.out.println(this.getClass()+" !constraintViolation.isEmpty()");
-    				request.getRequestDispatcher("product/edit.jsp").forward(request, response);
+    				request.getRequestDispatcher("admin/product/edit.jsp").forward(request, response);
     			}
     		}
     	} catch(NumberFormatException e){
@@ -272,7 +322,7 @@ public class ProductServlet extends HttpServlet {
     		errors+="</ul>";
     		request.setAttribute("product", product);
     		request.setAttribute("errors", errors);
-    		request.getRequestDispatcher("product/edit.jsp").forward(request, response);;
+    		request.getRequestDispatcher("admin/product/edit.jsp").forward(request, response);;
     	}
     }
 
@@ -283,7 +333,9 @@ public class ProductServlet extends HttpServlet {
 
         List<Product> listProduct = productDAO.selectAllProducts();
         request.setAttribute("listProduct", listProduct);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("product/list.jsp");
-        dispatcher.forward(request, response);
+        response.sendRedirect("/products");
+        //RequestDispatcher dispatcher = request.getRequestDispatcher("admin/product/list.jsp");
+        //dispatcher.forward(request, response);
     }
+      
 }

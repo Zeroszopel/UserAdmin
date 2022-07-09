@@ -9,25 +9,28 @@ public class Product {
     protected String name;
     protected String description;
     protected String category;
-    protected int price;
+    protected String image;
+	protected int price;
     
 
 	public Product() {}
 
-    public Product(String name, String description, String category,int price) {
+    public Product(String name, String description, String category,String image,int price) {
         super();
         this.name = name;
         this.description = description;
         this.category = category;
+        this.image= image;
         this.price = price;
     }
 
-    public Product(int id, String name, String description, String category,int price) {
+    public Product(int id, String name, String description, String category,String image,int price) {
         super();
         this.id = id;
         this.name = name;
         this.description = description;
         this.category = category;
+        this.image=image;
         this.price = price;
     }
 
@@ -38,7 +41,7 @@ public class Product {
         this.id = id;
     }
     @NotEmpty(message="Name cannot be empty")
-    @Pattern(regexp="([A-Z][a-z]*[0-9]*)(\s[A-Z][a-z]*[0-9]*)*",message=": First letter of each word must be uppercase")
+    @Pattern(regexp="([A-Z][a-z0-9]*\s*)*",message=": First letter of each word must be uppercase")
     @Length(min=3, max=50,message="Must be 3-50 Character")
     public String getName() {
         return name;
@@ -65,5 +68,11 @@ public class Product {
 	}
 	public void setPrice(int price) {
 		this.price = price;
+	}
+	public String getImage() {
+		return image;
+	}
+	public void setImage(String image) {
+		this.image = image;
 	}
 }

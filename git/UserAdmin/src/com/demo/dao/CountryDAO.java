@@ -14,12 +14,15 @@ public class CountryDAO implements ICountryDAO{
 	 private String jdbcURL = "jdbc:mysql://localhost:3306/demo";
 	    private String jdbcCountryname = "root";
 	    private String jdbcPassword = "";
+	    private int noOfRecords;
 
 	    private static final String INSERT_COUNTRY_SQL = "INSERT INTO Country" + "  (name) VALUES " +
 	            " (?);";
 
 	    private static final String SELECT_COUNTRY_BY_ID = "select id,name from country where id =?";
 	    private static final String SELECT_ALL_COUNTRY = "select * from country";
+	    private static final String SELECT_ALL_COUNTRY_PAGE = "select SQL_CALC_FOUND_ROWS * from country limit ?,?";
+	    private static final String SELECT_SEARCH_COUNTRY = "SELECT SQL_CALC_FOUND_ROWS * FROM country where id like N? or name like N? limit ?,?";
 	    private static final String DELETE_COUNTRY_SQL = "delete from country where id = ?;";
 	    private static final String UPDATE_COUNTRY_SQL = "update Country set name = ? where id = ?;";
 
@@ -29,7 +32,7 @@ public class CountryDAO implements ICountryDAO{
 	    protected Connection getConnection() {
 	        Connection connection = null;
 	        try {
-	            Class.forName("com.mysql.jdbc.Driver");
+	            Class.forName("com.mysql.cj.jdbc.Driver");
 	            connection = DriverManager.getConnection(jdbcURL, jdbcCountryname, jdbcPassword);
 	        } catch (SQLException e) {
 	            // TODO Auto-generated catch block
@@ -102,7 +105,68 @@ public class CountryDAO implements ICountryDAO{
 	        }
 	        return Country;
 		}
+		public List<Country> selectAllCountry(int offset,int noOfRecords) {
 
+	        // using try-with-resources to avoid closing resources (boiler plate code)
+	        List<Country> Country = new ArrayList<>();
+	        // Step 1: Establishing a Connection
+	        try {Connection connection = getConnection();
+
+	             // Step 2:Create a statement using connection object
+	             PreparedStatement statement = 
+	            		 connection.prepareStatement(SELECT_ALL_COUNTRY_PAGE);
+	            statement.setInt(1, offset);
+	            statement.setInt(2, noOfRecords);
+	            // Step 3: Execute the query or update query
+	            ResultSet rs = statement.executeQuery();
+
+	            // Step 4: Process the ResultSet object.
+	            while (rs.next()) {
+	                int id = rs.getInt("id");
+	                String name = rs.getString("name");
+	                Country.add(new Country(id, name));
+	            }
+	            statement=connection.prepareStatement("SELECT FOUND_ROWS()");
+	            rs = statement.executeQuery();
+	            if(rs.next())
+	                this.noOfRecords = rs.getInt(1);
+	        } catch (SQLException e) {
+	            printSQLException(e);
+	        }
+	        return Country;
+		}
+		public List<Country> selectSearchCountry(int offset,int noOfRecords,String search) {
+
+	        // using try-with-resources to avoid closing resources (boiler plate code)
+	        List<Country> Country = new ArrayList<>();
+	        // Step 1: Establishing a Connection
+	        try {Connection connection = getConnection();
+
+	             // Step 2:Create a statement using connection object
+	             PreparedStatement statement = 
+	            		 connection.prepareStatement(SELECT_SEARCH_COUNTRY);
+	            statement.setString(1, search);
+	            statement.setString(2, "%"+search+"%");
+	            statement.setInt(3, offset);
+	            statement.setInt(4, noOfRecords);
+	            // Step 3: Execute the query or update query
+	            ResultSet rs = statement.executeQuery();
+
+	            // Step 4: Process the ResultSet object.
+	            while (rs.next()) {
+	                int id = rs.getInt("id");
+	                String name = rs.getString("name");
+	                Country.add(new Country(id, name));
+	            }
+	            statement=connection.prepareStatement("SELECT FOUND_ROWS()");
+	            rs = statement.executeQuery();
+	            if(rs.next())
+	                this.noOfRecords = rs.getInt(1);
+	        } catch (SQLException e) {
+	            printSQLException(e);
+	        }
+	        return Country;
+		}
 		@Override
 		public boolean deleteCountry(int id) throws SQLException {
 			boolean rowDeleted;
@@ -124,6 +188,9 @@ public class CountryDAO implements ICountryDAO{
 	        }
 	        return rowUpdated;
 		}
+	    public int getNoOfRecords() {
+	        return noOfRecords;
+	    }
 		private void printSQLException(SQLException ex) {
 	        for (Throwable e : ex) {
 	            if (e instanceof SQLException) {

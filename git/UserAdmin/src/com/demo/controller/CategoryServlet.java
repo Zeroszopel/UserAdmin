@@ -16,10 +16,10 @@ import com.demo.model.Category;
 @WebServlet(name="CategoryServlet", urlPatterns= {"/category"})
 public class CategoryServlet extends HttpServlet{
 	   private static final long serialVersionUID = 1L;
-	    private CategoryDAO CategoryDAO;
+	    private CategoryDAO categoryDAO;
 
 	    public void init() {
-	        CategoryDAO = new CategoryDAO();
+	        categoryDAO = new CategoryDAO();
 	    }
 
 	    protected void doPost(HttpServletRequest request, HttpServletResponse response)
@@ -71,25 +71,48 @@ public class CategoryServlet extends HttpServlet{
 
 	    private void listCategory(HttpServletRequest request, HttpServletResponse response)
 	            throws SQLException, IOException, ServletException {
-	    	
-	        List<Category> listCategory = CategoryDAO.selectAllCategory();
-	        request.setAttribute("listCategory", listCategory);
-	        
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("category/list.jsp");
+	    	int page = 1;
+	        int recordsPerPage = 5;
+	        if(request.getParameter("page") != null)
+	            page = Integer.parseInt(request.getParameter("page"));
+	       
+	        String text=request.getParameter("search");
+	    	if(text!=null) {
+	    			if(text.trim()!="") {
+	    				
+	    				List<Category> listCategory = categoryDAO.selectSearchCategory((page-1)*recordsPerPage,
+                                recordsPerPage,text);
+	    				request.setAttribute("search", text);
+	    				request.setAttribute("listCategory", listCategory);
+	    			} else {
+	    				List<Category> listCategory = categoryDAO.selectAllCategory((page-1)*recordsPerPage,
+                                recordsPerPage);
+	    				request.setAttribute("listCategory", listCategory);
+	    			}
+	    	}else {
+	    		List<Category> listCategory = categoryDAO.selectAllCategory((page-1)*recordsPerPage,
+                        recordsPerPage);
+	    		request.setAttribute("listCategory", listCategory);
+	    	}
+	    	int noOfRecords = categoryDAO.getNoOfRecords();
+		    int noOfPages = (int) Math.ceil(noOfRecords * 1.0 / recordsPerPage);
+		    request.setAttribute("noOfPages", noOfPages);
+		    request.setAttribute("currentPage", page);
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/category/list.jsp");
 	        dispatcher.forward(request, response);
 	    }
 
 	    private void showNewForm(HttpServletRequest request, HttpServletResponse response)
 	            throws ServletException, IOException {
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("category/create.jsp");
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/category/create.jsp");
 	        dispatcher.forward(request, response);
 	    }
 
 	    private void showEditForm(HttpServletRequest request, HttpServletResponse response)
 	            throws SQLException, ServletException, IOException {
 	        int id = Integer.parseInt(request.getParameter("id"));
-	        Category existingCategory = CategoryDAO.selectCategory(id);
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("category/edit.jsp");
+	        Category existingCategory = categoryDAO.selectCategory(id);
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/category/edit.jsp");
 	        request.setAttribute("category", existingCategory);
 	        dispatcher.forward(request, response);
 
@@ -99,8 +122,8 @@ public class CategoryServlet extends HttpServlet{
 	            throws SQLException, IOException, ServletException {
 	        String name = request.getParameter("name");
 	        Category newCategory = new Category(name);
-	        CategoryDAO.insertCategory(newCategory);
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("category/create.jsp");
+	        categoryDAO.insertCategory(newCategory);
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/category/create.jsp");
 	        dispatcher.forward(request, response);
 	    }
 
@@ -110,9 +133,9 @@ public class CategoryServlet extends HttpServlet{
 	        String name = request.getParameter("name");
 	        System.out.println(name);
 	        Category book = new Category(id, name);
-	        CategoryDAO.updateCategory(book);
-	        Category existingCategory = CategoryDAO.selectCategory(id);
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("category/edit.jsp");
+	        categoryDAO.updateCategory(book);
+	        Category existingCategory = categoryDAO.selectCategory(id);
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/category/edit.jsp");
 	        request.setAttribute("category", existingCategory);
 	        dispatcher.forward(request, response);
 	    }
@@ -120,11 +143,11 @@ public class CategoryServlet extends HttpServlet{
 	    private void deleteCategory(HttpServletRequest request, HttpServletResponse response)
 	            throws SQLException, IOException, ServletException {
 	        int id = Integer.parseInt(request.getParameter("id"));
-	        CategoryDAO.deleteCategory(id);
+	        categoryDAO.deleteCategory(id);
 
-	        List<Category> listCategory = CategoryDAO.selectAllCategory();
+	        List<Category> listCategory = categoryDAO.selectAllCategory();
 	        request.setAttribute("listCategory", listCategory);
-	        RequestDispatcher dispatcher = request.getRequestDispatcher("category/list.jsp");
+	        RequestDispatcher dispatcher = request.getRequestDispatcher("admin/category/list.jsp");
 	        dispatcher.forward(request, response);
 	    }
 }

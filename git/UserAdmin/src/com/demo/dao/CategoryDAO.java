@@ -14,12 +14,15 @@ public class CategoryDAO implements ICategoryDAO{
 	 private String jdbcURL = "jdbc:mysql://localhost:3306/demo";
 	    private String jdbcCategoryname = "root";
 	    private String jdbcPassword = "";
+	    private int noOfRecords;
 
 	    private static final String INSERT_CATEGORY_SQL = "INSERT INTO Category" + "  (name) VALUES " +
 	            " (?);";
 
 	    private static final String SELECT_CATEGORY_BY_ID = "select id,name from category where id =?";
 	    private static final String SELECT_ALL_CATEGORY = "select * from category";
+	    private static final String SELECT_ALL_CATEGORY_PAGE = "select SQL_CALC_FOUND_ROWS * from category limit ?,?";
+	    private static final String SELECT_SEARCH_CATEGORY = "SELECT SQL_CALC_FOUND_ROWS * FROM category where id like N? or name like N? limit ?,?";
 	    private static final String DELETE_CATEGORY_SQL = "delete from category where id = ?;";
 	    private static final String UPDATE_CATEGORY_SQL = "update Category set name = ? where id = ?;";
 
@@ -29,7 +32,7 @@ public class CategoryDAO implements ICategoryDAO{
 	    protected Connection getConnection() {
 	        Connection connection = null;
 	        try {
-	            Class.forName("com.mysql.jdbc.Driver");
+	            Class.forName("com.mysql.cj.jdbc.Driver");
 	            connection = DriverManager.getConnection(jdbcURL, jdbcCategoryname, jdbcPassword);
 	        } catch (SQLException e) {
 	            // TODO Auto-generated catch block
@@ -102,7 +105,68 @@ public class CategoryDAO implements ICategoryDAO{
 	        }
 	        return Category;
 		}
+		public List<Category> selectAllCategory(int offset,int noOfRecords) {
 
+	        // using try-with-resources to avoid closing resources (boiler plate code)
+	        List<Category> Category = new ArrayList<>();
+	        // Step 1: Establishing a Connection
+	        try {Connection connection = getConnection();
+
+	             // Step 2:Create a statement using connection object
+	             PreparedStatement statement = 
+	            		 connection.prepareStatement(SELECT_ALL_CATEGORY_PAGE);
+	            statement.setInt(1, offset);
+	            statement.setInt(2, noOfRecords);
+	            // Step 3: Execute the query or update query
+	            ResultSet rs = statement.executeQuery();
+
+	            // Step 4: Process the ResultSet object.
+	            while (rs.next()) {
+	                int id = rs.getInt("id");
+	                String name = rs.getString("name");
+	                Category.add(new Category(id, name));
+	            }
+	            statement=connection.prepareStatement("SELECT FOUND_ROWS()");
+	            rs = statement.executeQuery();
+	            if(rs.next())
+	                this.noOfRecords = rs.getInt(1);
+	        } catch (SQLException e) {
+	            printSQLException(e);
+	        }
+	        return Category;
+		}
+		public List<Category> selectSearchCategory(int offset,int noOfRecords,String search) {
+
+	        // using try-with-resources to avoid closing resources (boiler plate code)
+	        List<Category> Category = new ArrayList<>();
+	        // Step 1: Establishing a Connection
+	        try {Connection connection = getConnection();
+
+	             // Step 2:Create a statement using connection object
+	             PreparedStatement statement = 
+	            		 connection.prepareStatement(SELECT_SEARCH_CATEGORY);
+	             statement.setString(1, search);
+	             statement.setString(2, "%"+search+"%");
+	            statement.setInt(3, offset);
+	            statement.setInt(4, noOfRecords);
+	            // Step 3: Execute the query or update query
+	            ResultSet rs = statement.executeQuery();
+
+	            // Step 4: Process the ResultSet object.
+	            while (rs.next()) {
+	                int id = rs.getInt("id");
+	                String name = rs.getString("name");
+	                Category.add(new Category(id, name));
+	            }
+	            statement=connection.prepareStatement("SELECT FOUND_ROWS()");
+	            rs = statement.executeQuery();
+	            if(rs.next())
+	                this.noOfRecords = rs.getInt(1);
+	        } catch (SQLException e) {
+	            printSQLException(e);
+	        }
+	        return Category;
+		}
 		@Override
 		public boolean deleteCategory(int id) throws SQLException {
 			boolean rowDeleted;
@@ -124,6 +188,9 @@ public class CategoryDAO implements ICategoryDAO{
 	        }
 	        return rowUpdated;
 		}
+	    public int getNoOfRecords() {
+	        return noOfRecords;
+	    }
 		private void printSQLException(SQLException ex) {
 	        for (Throwable e : ex) {
 	            if (e instanceof SQLException) {
